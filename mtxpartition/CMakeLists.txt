@@ -40,7 +40,6 @@ set(PROJECT_SOURCES
 	../acg/config.h
 	../acg/comm.c
 	../acg/comm.h
-#	../acg/comm-rocshmem.hip
 	../acg/error.c
 	../acg/error.h
 	../acg/fmtspec.c
@@ -48,12 +47,13 @@ set(PROJECT_SOURCES
 	../acg/graph.c
 	../acg/graph.h
 	../acg/halo.c
-#	../acg/halo-kernels-hip.hip
 	../acg/halo.h
 	../acg/metis.c
 	../acg/metis.h
 	../acg/mtxfile.c
 	../acg/mtxfile.h
+  ../acg/prefixsum.c
+  ../acg/prefixsum.h
 	../acg/sort.c
 	../acg/sort.h
 	../acg/symcsrmatrix.c
@@ -112,6 +112,5 @@ if (ZLIB_FOUND)
 endif ()
 if (METIS_FOUND)
   target_include_directories(${PROJECT_NAME} PRIVATE ${METIS_INCLUDE_DIRS})
-  target_link_directories(${PROJECT_NAME} PRIVATE ${METIS_LIBRARY_DIR})
-  target_link_libraries(${PROJECT_NAME} metis)
+  target_link_libraries(${PROJECT_NAME} ${METIS_LIBRARY})
 endif ()

@@ -37,6 +37,7 @@
 
 #include "acg/config.h"
 #include "acg/cghip.h"
+#include "acg/cg-kernels-hip.h"
 #include "acg/cgpetsc.h"
 #include "acg/comm.h"
 #include "acg/error.h"

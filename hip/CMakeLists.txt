@@ -30,7 +30,7 @@
 
 cmake_minimum_required(VERSION 3.12)
 
-project(acg-hip LANGUAGES C CXX HIP)
+project(acg-hip LANGUAGES HIP C CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
@@ -175,8 +175,7 @@ if(OpenMP_C_FOUND)
 endif()
 if (METIS_FOUND)
   target_include_directories(${PROJECT_NAME} PRIVATE ${METIS_INCLUDE_DIRS})
-  target_link_directories(${PROJECT_NAME} PRIVATE ${METIS_LIBRARY_DIR})
-  target_link_libraries(${PROJECT_NAME} metis)
+  target_link_libraries(${PROJECT_NAME} ${METIS_LIBRARY})
 endif ()
 if (PETSC_FOUND)
   target_include_directories(${PROJECT_NAME} PRIVATE ${PETSC_INCLUDE_DIRS})
