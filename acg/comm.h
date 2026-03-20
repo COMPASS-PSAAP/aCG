@@ -49,6 +49,9 @@
 #ifdef ACG_HAVE_RCCL
 #include <rccl/rccl.h>
 #endif
+#ifdef ACG_HAVE_STREAM_TRIGGERING
+#include <stream-triggering.h>
+#endif
 
 #include <stdio.h>
 
@@ -89,6 +92,9 @@ enum acgcommtype
     acgcomm_rccl,     /* RCCL communicator */
     acgcomm_nvshmem,  /* NVSHMEM communicator */
     acgcomm_rocshmem,  /* rocSHMEM communicator */
+#ifdef ACG_HAVE_STREAM_TRIGGERING
+    acgcomm_st, /* MPI Advance Stream-triggering communicator*/
+#endif
 };
 
 /**
@@ -114,6 +120,11 @@ struct acgcomm
 #if defined(ACG_HAVE_NCCL) || defined(ACG_HAVE_RCCL)
     ncclComm_t ncclcomm;
 #endif
+
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    MPIS_Queue mpist_queue;
+#endif
+
 };
 
 #if defined(ACG_HAVE_MPI)
@@ -122,6 +133,17 @@ struct acgcomm
  * communicator.
  */
 ACG_API int acgcomm_init_mpi(
+    struct acgcomm * comm,
+    MPI_Comm mpicomm,
+    int * mpierrcode);
+#endif
+
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+/**
+ * ‘acgcomm_init_st()’ mirrors "acgcomm_init_mpi" except that
+ * it sets "comm->type" to "acgcomm_st"
+ */
+ACG_API int acgcomm_init_st(
     struct acgcomm * comm,
     MPI_Comm mpicomm,
     int * mpierrcode);

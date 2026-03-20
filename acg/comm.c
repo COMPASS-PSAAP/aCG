@@ -85,6 +85,23 @@ int acgcomm_init_mpi(
 }
 #endif
 
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+/**
+ * ‘acgcomm_init_st()’ mirrors "acgcomm_init_mpi" except that
+ * it sets "comm->type" to "acgcomm_st"
+ */
+int acgcomm_init_st(
+    struct acgcomm * comm,
+    MPI_Comm mpicomm,
+    int * mpierrcode)
+{
+    int err = MPI_Comm_dup(mpicomm, &comm->mpicomm);
+    if (err) { if (mpierrcode) *mpierrcode = err; return ACG_ERR_MPI; }
+    comm->type = acgcomm_st;
+    return ACG_SUCCESS;
+}
+#endif
+
 #if defined(ACG_HAVE_NCCL)
 /**
  * ‘acgcomm_init_nccl()’ creates a communicator from a given NCCL
@@ -136,6 +153,9 @@ void acgcomm_free(
 #if defined(ACG_HAVE_MPI)
     if (comm->type == acgcomm_mpi) MPI_Comm_free(&comm->mpicomm);
 #endif
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    if (comm->type == acgcomm_st) MPI_Comm_free(&comm->mpicomm);
+#endif
 #if defined(ACG_HAVE_NCCL)
     /* if (comm->type == acgcomm_nccl) ncclCommDestroy(comm->ncclcomm); */
 #endif
@@ -157,6 +177,13 @@ int acgcomm_size(
     if (comm->type == acgcomm_null) return 1;
 #if defined(ACG_HAVE_MPI)
     else if (comm->type == acgcomm_mpi) {
+        int err = MPI_Comm_size(comm->mpicomm, commsize);
+        if (err) return ACG_ERR_MPI;
+        return ACG_SUCCESS;
+    }
+#endif
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    else if (comm->type == acgcomm_st)  {
         int err = MPI_Comm_size(comm->mpicomm, commsize);
         if (err) return ACG_ERR_MPI;
         return ACG_SUCCESS;
@@ -194,6 +221,13 @@ int acgcomm_rank(
     if (comm->type == acgcomm_null) return 0;
 #if defined(ACG_HAVE_MPI)
     else if (comm->type == acgcomm_mpi) {
+        int err = MPI_Comm_rank(comm->mpicomm, rank);
+        if (err) return ACG_ERR_MPI;
+        return ACG_SUCCESS;
+    }
+#endif
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    else if (comm->type == acgcomm_st)  {
         int err = MPI_Comm_rank(comm->mpicomm, rank);
         if (err) return ACG_ERR_MPI;
         return ACG_SUCCESS;
@@ -413,6 +447,16 @@ int acgcomm_barrier_hip(
 #else
         return ACG_ERR_MPI_NOT_SUPPORTED;
 #endif
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    } else if (comm->type == acgcomm_st) {
+#if defined(ACG_HAVE_MPI)
+        hipStreamSynchronize(stream);
+        err = MPI_Barrier(comm->mpicomm);
+        if (err) { if (errcode) *errcode = err; return ACG_ERR_MPI; }
+#else
+        return ACG_ERR_MPI_NOT_SUPPORTED;
+#endif
+#endif
     } else if (comm->type == acgcomm_rccl) {
 #if defined(ACG_HAVE_RCCL)
         err = ncclAllReduce(NULL, NULL, 0, ncclInt, ncclSum, comm->ncclcomm, stream);
@@ -454,6 +498,17 @@ int acgcomm_allreduce_hip(
         if (err) { if (errcode) *errcode = err; return ACG_ERR_MPI; }
 #else
         return ACG_ERR_MPI_NOT_SUPPORTED;
+#endif
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    } else if (comm->type == acgcomm_st) {
+#if defined(ACG_HAVE_MPI)
+        hipStreamSynchronize(stream);
+        err = MPI_Allreduce(
+            src, dst, count, acgdatatype_mpi(datatype), acgop_mpi(op), comm->mpicomm);
+        if (err) { if (errcode) *errcode = err; return ACG_ERR_MPI; }
+#else
+        return ACG_ERR_MPI_NOT_SUPPORTED;
+#endif
 #endif
     } else if (comm->type == acgcomm_rccl) {
 #if defined(ACG_HAVE_RCCL)

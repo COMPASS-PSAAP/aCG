@@ -3,7 +3,8 @@ import sys
 
 # Usage: grep <flags> <pattern> <file(s)> | python3 parse_outputs.py > results.csv
 
-mode_dict = {0: "mpi", 1: "rccl"}
+#mode_dict = {0: "mpi", 1: "rccl"}
+mode_dict = {0: "mpi", 1: "st"}
 mode = 0
 
 for line in sys.stdin:
@@ -16,7 +17,9 @@ for line in sys.stdin:
     time = time.strip().split(" ")[0]
 
     # Break off matrix name
-    _, config, matrix, = file.split("/")
+    data = file.split("/")
+    config = data[-2]
+    matrix = data[-1]
     # Remove file extension
     matrix = matrix.split(".")[0]
     # Split up matrix and ppn

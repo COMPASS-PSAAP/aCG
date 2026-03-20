@@ -55,6 +55,10 @@
 #include <hipsparse/hipsparse.h>
 #endif
 
+#ifdef ACG_HAVE_STREAM_TRIGGERING
+#include <stream-triggering.h>
+#endif
+
 #include <fenv.h>
 #include <float.h>
 #include <math.h>
@@ -82,7 +86,8 @@
  * ‘acgsolverhip_free()’ frees storage allocated for a solver.
  */
 void acgsolverhip_free(
-    struct acgsolverhip * cg)
+    struct acgsolverhip * cg,
+    const struct acgcomm * comm)
 {
     acgvector_free(&cg->r);
     acgvector_free(&cg->p);
@@ -91,10 +96,10 @@ void acgsolverhip_free(
     if (cg->q) { acgvector_free(cg->q); } free(cg->q);
     if (cg->z) { acgvector_free(cg->z); } free(cg->z);
     if (cg->dx) { acgvector_free(cg->dx); } free(cg->dx);
+    if (cg->haloexchange) acghaloexchange_free(cg->haloexchange, cg->halo, comm);
+    free(cg->haloexchange);
     if (cg->halo) acghalo_free(cg->halo);
     free(cg->halo);
-    if (cg->haloexchange) acghaloexchange_free(cg->haloexchange);
-    free(cg->haloexchange);
     if (!cg->use_rocshmem) {
         hipFree(cg->d_bnrm2sqr);
         hipFree(cg->d_r0nrm2sqr);
@@ -507,6 +512,30 @@ int acgsolverhip_solvempi(
     err = hipEventCreateWithFlags(&preadytosend, hipEventDisableTiming); if (err) return ACG_ERR_HIP;
     err = hipEventRecord(preadytosend, stream); if (err) return ACG_ERR_HIP;
     err = hipEventCreateWithFlags(&preceived, hipEventDisableTiming); if (err) return ACG_ERR_HIP;
+
+#ifdef ACG_HAVE_STREAM_TRIGGERING
+    if(comm->type == acgcomm_st)
+    {
+        /* Create specialized MPIS_Queue */
+        err = MPIS_Queue_init(&comm->mpist_queue, CXI, &commstream);
+        /* Match MPIS_Requests made earlier*/
+        void* match_send_reqs = malloc(halo->nrecipients*sizeof(MPIS_Request));
+        void* match_recv_reqs = malloc(halo->nsenders*sizeof(MPIS_Request));
+        for (int p = 0; p < halo->nsenders; p++) {
+            err = MPIS_Imatch(&((MPIS_Request *) cg->haloexchange->recvreqs)[p],
+                        &((MPIS_Request *) match_recv_reqs)[p]);
+        }
+        for (int p = 0; p < halo->nrecipients; p++) {
+            err = MPIS_Imatch(&((MPIS_Request *) cg->haloexchange->sendreqs)[p],
+                    &((MPIS_Request *) match_send_reqs)[p]);
+        }
+        /* Finish all matches. */
+        err = MPIS_Waitall(halo->nsenders, match_recv_reqs, MPI_STATUSES_IGNORE);
+        err = MPIS_Waitall(halo->nrecipients, match_send_reqs, MPI_STATUSES_IGNORE);
+        free(match_send_reqs);
+        free(match_recv_reqs);
+    }
+#endif
 
     /* create hipsparse matrix and vectors */
     hipsparseDnVecDescr_t vecx, vecr, vecp, vect;
@@ -1133,6 +1162,15 @@ int acgsolverhip_solvempi(
     }
     hipFree(d_x); hipFree(d_b);
     hipHostFree(rnrm2sqr);
+
+#ifdef ACG_HAVE_STREAM_TRIGGERING
+    if(comm->type == acgcomm_st)
+    {
+        /* Create specialized MPIS_Queue */
+        MPIS_Queue_free(&comm->mpist_queue);
+    }
+#endif
+
     hipStreamDestroy(commstream);
     hipStreamDestroy(copystream);
 

@@ -126,7 +126,8 @@ struct acgsolverhip
  * ‘acgsolverhip_free()’ frees storage allocated for a solver.
  */
 ACG_API void acgsolverhip_free(
-    struct acgsolverhip * cg);
+    struct acgsolverhip * cg,
+    const struct acgcomm * comm);
 
 /*
  * initialise a solver

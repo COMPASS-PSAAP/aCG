@@ -46,6 +46,10 @@
 #include <hip/hip_runtime_api.h>
 #endif
 
+#ifdef ACG_HAVE_STREAM_TRIGGERING
+#include <stream-triggering.h>
+#endif
+
 #include <errno.h>
 
 #include <stdbool.h>
@@ -806,7 +810,16 @@ int acghaloexchange_init(
 #else
         return ACG_ERR_MPI_NOT_SUPPORTED;
 #endif
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    } else if (comm->type == acgcomm_st) {
+        sendreqs = malloc(halo->nrecipients*sizeof(MPIS_Request));
+        if (!sendreqs) { free(recvbuf); free(sendbuf); return ACG_ERR_ERRNO; }
+        recvreqs = malloc(halo->nsenders*sizeof(MPIS_Request));
+        if (!recvreqs) { free(sendreqs); free(recvbuf); free(sendbuf); return ACG_ERR_ERRNO; }
     }
+#else
+    }
+#endif
 
     haloexchange->sendtype = sendtype;
     haloexchange->recvtype = recvtype;
@@ -1123,10 +1136,21 @@ int acghaloexchange_init_cuda(
  * exchange.
  */
 void acghaloexchange_free(
-    struct acghaloexchange * haloexchange)
+    struct acghaloexchange * haloexchange,
+    const struct acghalo * halo,
+    const struct acgcomm * comm)
 {
     free(haloexchange->sendbuf);
     free(haloexchange->recvbuf);
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    if(comm->type == acgcomm_st)
+    {
+        //for(int index = 0; index < halo->nrecipients; index++)
+        //    MPIS_Request_free(&haloexchange->sendreqs[index]);
+        //for(int index = 0; index < halo->nsenders; index++)
+        //    MPIS_Request_free(&haloexchange->recvreqs[index]);
+    }
+#endif
     free(haloexchange->sendreqs);
     free(haloexchange->recvreqs);
 #if defined(ACG_HAVE_CUDA)
@@ -1774,6 +1798,35 @@ int acghaloexchange_init_hip(
         }
     }
 
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    if (comm->type == acgcomm_st) {
+        MPI_Comm mpicomm = comm->mpicomm;
+        int rank;
+        MPI_Comm_rank(mpicomm, &rank);
+        int tag = 99;
+        for (int p = 0; p < halo->nsenders; p++) {
+#if defined(ACG_DEBUG_HALO)
+            fprintf(stderr, "%s: posting MPI_Irecv %d of %d for rank %d of size %d at offset %d from sender %d with tag %d\n", __func__, p+1, halo->nsenders, rank, halo->recvcounts[p], halo->rdispls[p], halo->senders[p], tag);
+#endif
+            void * recvbufp = (char *) d_recvbuf + recvtypesize*halo->rdispls[p];
+            err = MPIS_Recv_init(
+                    recvbufp, halo->recvcounts[p], acgdatatype_mpi(recvtype), halo->senders[p],
+                    tag, mpicomm, MPI_INFO_NULL, &((MPIS_Request *) haloexchange->recvreqs)[p]);
+            if (err) return ACG_ERR_MPI;
+        }
+        for (int p = 0; p < halo->nrecipients; p++) {
+#if defined(ACG_DEBUG_HALO)
+            fprintf(stderr, "%s: posting MPI_Isend %d of %d from rank %d of size %d at offset %d for recipient %d with tag %d\n", __func__, p+1, halo->nrecipients, rank, halo->sendcounts[p], halo->sdispls[p], halo->recipients[p], tag);
+#endif
+            void * sendbufp = (char *) d_sendbuf + sendtypesize*halo->sdispls[p];
+            err = MPIS_Send_init(
+                    sendbufp, halo->sendcounts[p], acgdatatype_mpi(sendtype), halo->recipients[p],
+                    tag, mpicomm, MPI_INFO_NULL, &((MPIS_Request *) haloexchange->sendreqs)[p]);
+            if (err) return ACG_ERR_MPI;
+        }
+    }
+#endif
+
     haloexchange->d_sendbuf = d_sendbuf;
     haloexchange->d_recvbuf = d_recvbuf;
     haloexchange->d_sendbufidx = d_sendbufidx;
@@ -2055,6 +2108,11 @@ int acghalo_exchange_hip_begin(
         if (err) { if (mpierrcode) *mpierrcode = err; return ACG_ERR_MPI; }
         err = MPI_Startall(halo->nrecipients, sendreqs);
         if (err) { if (mpierrcode) *mpierrcode = err; return ACG_ERR_MPI; }
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    } else if (comm->type == acgcomm_st) {
+        MPIS_Enqueue_startall(comm->mpist_queue, halo->nsenders, recvreqs);
+        MPIS_Enqueue_startall(comm->mpist_queue, halo->nrecipients, sendreqs);
+#endif
     } else if (comm->type == acgcomm_rccl) {
 #if defined(ACG_HAVE_RCCL)
         err = halo_alltoallv_rccl(
@@ -2145,6 +2203,19 @@ int acghalo_exchange_hip_end(
             halo->nmpiirecv += halo->nsenders;
             halo->Bmpiirecv += halo->recvsize*recvtypesize;
         }
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    } else if (comm->type == acgcomm_st) {
+        MPIS_Enqueue_waitall(comm->mpist_queue);
+        if (!warmup) {
+            int sendtypesize, recvtypesize;
+            err = acgdatatype_size(sendtype, &sendtypesize); if (err) return err;
+            err = acgdatatype_size(recvtype, &recvtypesize); if (err) return err;
+            halo->nmpisend += halo->nrecipients;
+            halo->Bmpisend += halo->sendsize*sendtypesize;
+            halo->nmpiirecv += halo->nsenders;
+            halo->Bmpiirecv += halo->recvsize*recvtypesize;
+        }
+#endif
     } else if (comm->type == acgcomm_rccl) {
 #if defined(ACG_HAVE_RCCL)
         /* do nothing */

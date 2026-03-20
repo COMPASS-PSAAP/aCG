@@ -2067,7 +2067,7 @@ int acgsolverhip_solve_device(
     /* free vectors */
     hipFree(d_startrows);
     hipFree(d_x); hipFree(d_b);
-    acghaloexchange_free(&haloexchange);
+    acghaloexchange_free(&haloexchange, halo, comm);
 
     /* check for HIP errors */
     if (hipGetLastError() != hipSuccess)

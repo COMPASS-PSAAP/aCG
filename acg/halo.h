@@ -395,7 +395,9 @@ ACG_API int acghaloexchange_init_hip(
  * exchange.
  */
 ACG_API void acghaloexchange_free(
-    struct acghaloexchange * haloexchange);
+    struct acghaloexchange * haloexchange,
+    const struct acghalo * halo,
+    const struct acgcomm * comm);
 
 /**
  * ‘acghaloexchange_profile()’ obtain detailed performance profiling

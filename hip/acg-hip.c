@@ -71,6 +71,10 @@
 #include <rccl/rccl.h>
 #endif
 
+#ifdef ACG_HAVE_STREAM_TRIGGERING
+#include <stream-triggering.h>
+#endif
+
 #include <float.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -351,7 +355,11 @@ static void program_options_print_help(
     fprintf(f, "  --warmup N            perform N warmup iterations. [10]\n");
     fprintf(f, "\n");
     fprintf(f, " Communication library options:\n");
+#ifdef ACG_HAVE_STREAM_TRIGGERING
+    fprintf(f, "  --comm TYPE           none, mpi, rccl, rocshmem, or st. [mpi]\n");
+#else
     fprintf(f, "  --comm TYPE           none, mpi, rccl or rocshmem. [mpi]\n");
+#endif
     fprintf(f, "\n");
     fprintf(f, " Solver verification options:\n");
     fprintf(f, "  --manufactured-solution  Use a manufactured solution and right-hand side.\n");
@@ -700,6 +708,10 @@ static int parse_program_options(
                 args->commtype = acgcomm_rccl;
             } else if (strcasecmp(s, "rocshmem") == 0) {
                 args->commtype = acgcomm_rocshmem;
+#ifdef ACG_HAVE_STREAM_TRIGGERING
+            } else if (strcasecmp(s, "st") == 0) {
+                args->commtype = acgcomm_st;
+#endif
             } else { return EINVAL; }
             (*nargs)++; argv++; continue;
         }
@@ -963,6 +975,9 @@ int main(int argc, char *argv[])
     int output_comm_matrix = args.output_comm_matrix;
     int use_rccl = args.commtype == acgcomm_rccl;
     int use_rocshmem = args.commtype == acgcomm_rocshmem;
+#ifdef ACG_HAVE_STREAM_TRIGGERING
+    int use_st = args.commtype == acgcomm_st;
+#endif
     int use_petsc = (args.solvertype == acgsolver_petsc || args.solvertype == acgsolver_petsc_pipelined);
 
     /* select a HIP device */
@@ -1156,6 +1171,17 @@ int main(int argc, char *argv[])
         MPI_Finalize();
         hipDeviceReset();
         return EXIT_FAILURE;
+#endif
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    } else if (use_st) {
+        if (rank == root && use_st) fprintf(stderr, "Using MPI alongside ST communication\n");
+        err = acgcomm_init_st(&comm, mpicomm, &mpierrcode);
+        if (err) {
+            fprintf(stderr, "%s: %s\n", program_invocation_short_name, acgerrcodestr(err,mpierrcode));
+            MPI_Finalize();
+            hipDeviceReset();
+            return EXIT_FAILURE;
+        }
 #endif
     } else {
         if (rank == root) fprintf(stderr, "Using MPI for communication\n");
@@ -2249,7 +2275,7 @@ int main(int argc, char *argv[])
         if (err) {
             if (rank == root)
                 fprintf(stderr, "%s: %s\n", program_invocation_short_name, acgerrcodestr(err, mpierrcode));
-            acgsolverhip_free(&cg);
+            acgsolverhip_free(&cg, &comm);
             acgvector_free(&x);
             acgvector_free(&b);
             acgsymcsrmatrix_free(&A);
@@ -2268,7 +2294,7 @@ int main(int argc, char *argv[])
             hipDeviceReset();
             return EXIT_FAILURE;
         }
-        acgsolverhip_free(&cg);
+        acgsolverhip_free(&cg, &comm);
     } else {
         if (verbose > 0) {
             if (rank == root) fprintf(stderr, "preparing solver: ");
