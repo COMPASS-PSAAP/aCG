@@ -138,6 +138,33 @@ if (ZLIB_FOUND)
     add_definitions(-DACG_HAVE_LIBZ)
 endif ()
 
+# 1. Establish the ROCM_PATH fallback (defaults to /opt/rocm)
+if(NOT DEFINED ROCM_PATH)
+    if(DEFINED ENV{ROCM_PATH})
+        set(ROCM_PATH $ENV{ROCM_PATH} CACHE PATH "Path to ROCm installation")
+    else()
+        set(ROCM_PATH "/opt/rocm" CACHE PATH "Path to ROCm installation")
+    endif()
+endif()
+
+# 2. Find the roctx64 library and its include directory
+find_library(ROCTX_LIB 
+    NAMES rocprofiler-sdk-roctx 
+    HINTS ${ROCM_PATH}/lib
+)
+find_path(ROCTX_INCLUDE_DIR 
+    NAMES roctracer/roctx.h 
+    HINTS ${ROCM_PATH}/include
+)
+
+# Optional: Fail the build early if roctx isn't found
+if(NOT ROCTX_LIB OR NOT ROCTX_INCLUDE_DIR)
+    message(FATAL_ERROR "Could not find roctx64 library or roctracer headers in ${ROCM_PATH}")
+endif()
+
+message(STATUS "Found ROCTX Include: ${ROCTX_INCLUDE_DIR}")
+message(STATUS "Found ROCTX Library: ${ROCTX_LIB}")
+
 if (IDXSIZE EQUAL 64)
   message(STATUS "index type for matrices and vectors (acgidx_t) - int64_t")
   if (NOT SIZEOF_IDX_T EQUAL 8)
@@ -171,8 +198,10 @@ if (PETSC_FOUND)
 endif ()
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
+#target_link_libraries(${PROJECT_NAME} MPI::MPI_C m hip::device hipblas hipsparse ${ROCTX_LIB})
 target_link_libraries(${PROJECT_NAME} MPI::MPI_C m hip::device hipblas hipsparse)
 target_include_directories(${PROJECT_NAME} PRIVATE ..)
+#target_include_directories(${PROJECT_NAME} PRIVATE ${MPI_INCLUDE_DIRS} ${ROCTX_INCLUDE_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MPI_INCLUDE_DIRS})
 
 if(OpenMP_C_FOUND)

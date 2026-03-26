@@ -66,6 +66,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+//#include <rocprofiler-sdk-roctx/roctx.h>
+
 /*
  * profiling
  */
@@ -512,6 +514,8 @@ int acgsolverhip_solvempi(
     err = hipEventCreateWithFlags(&preadytosend, hipEventDisableTiming); if (err) return ACG_ERR_HIP;
     err = hipEventRecord(preadytosend, stream); if (err) return ACG_ERR_HIP;
     err = hipEventCreateWithFlags(&preceived, hipEventDisableTiming); if (err) return ACG_ERR_HIP;
+
+    //roctxProfilerResume(0);
 
 #ifdef ACG_HAVE_STREAM_TRIGGERING
     if(comm->type == acgcomm_st)

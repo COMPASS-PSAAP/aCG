@@ -7,6 +7,9 @@ import sys
 mode_dict = {0: "mpi", 1: "st"}
 mode = 0
 
+# Print top row.
+print("nodes,ntasks,matrix,backend,solver_time,system,date")
+
 for line in sys.stdin:
     # Remove trailing newline
     line = line.rstrip("\n")
@@ -34,7 +37,7 @@ for line in sys.stdin:
     # Peel off run number
     date, _ = date.rsplit("-", 1)
 
-    print(system, nodes, (int(ppn)*int(nodes)), date, matrix, ppn, time, mode_dict[mode], sep=",")
+    print(nodes, ppn, matrix, mode_dict[mode], time, system, date, sep=",")
     # Two modes per file (so for the next line, switch to other mode)
     mode ^= 1
 

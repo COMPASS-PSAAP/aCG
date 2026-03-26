@@ -75,6 +75,8 @@
 #include <stream-triggering.h>
 #endif
 
+//#include <rocprofiler-sdk-roctx/roctx.h>
+
 #include <float.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -859,6 +861,9 @@ int main(int argc, char *argv[])
     int threadlevel;
     mpierrcode = MPI_Init_thread(
         &argc, &argv, MPI_THREAD_FUNNELED, &threadlevel);
+
+    //roctxProfilerPause(0);
+
     if (mpierrcode) {
         MPI_Error_string(mpierrcode, mpierrstr, &mpierrstrlen);
         fprintf(stderr, "%s: MPI_Init_thread failed with %s\n",

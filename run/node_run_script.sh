@@ -21,12 +21,15 @@ END_PPN_POWER=2
 ACG_EXE=/g/g16/derek/git/aCG/build/acg-hip
 MXT_EXE=/g/g16/derek/git/aCG/build2/mtxpartition
 
-MATRICES=("audikw_1" "Bump_2911" "Cube_Coup_dt0" "Flan_1565" "Queen_4147" "Serena")
-#MATRICES=("audikw_1" "Bump_2911")
+#MATRICES=("poisson1d_1073741824")
+#MATRICES=("audikw_1" "Bump_2911" "Cube_Coup_dt0" "Flan_1565" "Queen_4147" "Serena")
+#MATRICES=("audikw_1" "Serena")
+MATRICES=("nd24k")
 #MODES=("mpi" "rccl" "st")
 MODES=("mpi" "st")
 
 #ulimit -c unlimited
+#ROCPROF_EXE="rocprofv3 --output-directory /usr/workspace/derek/out --sys-trace --output-format pftrace --"
 
 # Scale through PPN
 for (( exp=START_PPN_POWER; exp<=END_PPN_POWER; exp++ )); do
@@ -35,6 +38,9 @@ for (( exp=START_PPN_POWER; exp<=END_PPN_POWER; exp++ )); do
     for MATRIX in "${MATRICES[@]}"; do
         # Which files to use for the given matrix
         MATRIX_FILE="/usr/workspace/derek/aCG/input/$MATRIX.mtx"
+        if [ "$MATRIX" == "poisson1d_1073741824" ]; then
+            MATRIX_FILE="--binary /usr/workspace/derek/aCG/input/$MATRIX.mtxbin32"
+        fi
         PARTITION_FILE="/usr/workspace/derek/aCG/partitions/${MATRIX}_${PARTITIONS}_parts.mtx"
         # Make partition file if necessary
         if [[ ! -f "$PARTITION_FILE" ]]; then
@@ -62,7 +68,7 @@ for (( exp=START_PPN_POWER; exp<=END_PPN_POWER; exp++ )); do
 
             flux run --setopt=mpibind=verbose:1 -x --nodes=$NODES --tasks-per-node=$PPN \
             --job-name="$JOB_NAME" --output="${ACG_OUT}/${JOB_NAME}.out" -o output.mode=append \
-            ${ACG_EXE} ${MATRIX_FILE} \
+            ${ROCPROF_EXE} ${ACG_EXE} ${MATRIX_FILE} \
             --partition=${PARTITION_FILE} \
             --seed 101 --residual-atol 0 --residual-rtol 1e-6 --max-iterations 100000 \
             --solver acg --comm $MODE --manufactured-solution --verbose -q

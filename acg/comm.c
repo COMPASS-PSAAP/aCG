@@ -50,6 +50,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+//#include <rocprofiler-sdk-roctx/roctx.h>
+
 /* default communicators */
 struct acgcomm ACG_COMM_NULL = { acgcomm_null };
 #ifdef ACG_HAVE_MPI
@@ -493,8 +495,10 @@ int acgcomm_allreduce_hip(
     else if (comm->type == acgcomm_mpi) {
 #if defined(ACG_HAVE_MPI)
         hipStreamSynchronize(stream);
+        //roctxRangePush("MPI Allreduce");
         err = MPI_Allreduce(
             src, dst, count, acgdatatype_mpi(datatype), acgop_mpi(op), comm->mpicomm);
+        //roctxRangePop();
         if (err) { if (errcode) *errcode = err; return ACG_ERR_MPI; }
 #else
         return ACG_ERR_MPI_NOT_SUPPORTED;
@@ -503,8 +507,10 @@ int acgcomm_allreduce_hip(
     } else if (comm->type == acgcomm_st) {
 #if defined(ACG_HAVE_MPI)
         hipStreamSynchronize(stream);
+        //roctxRangePush("MPI Allreduce");
         err = MPI_Allreduce(
             src, dst, count, acgdatatype_mpi(datatype), acgop_mpi(op), comm->mpicomm);
+        //roctxRangePop();
         if (err) { if (errcode) *errcode = err; return ACG_ERR_MPI; }
 #else
         return ACG_ERR_MPI_NOT_SUPPORTED;
