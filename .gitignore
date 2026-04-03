@@ -2,3 +2,6 @@ build/**
 build2/**
 run/outputs/**
 run/*.out
+run/parse/csvs/**
+*.csv
+*.png

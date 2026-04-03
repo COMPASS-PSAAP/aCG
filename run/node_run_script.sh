@@ -4,15 +4,15 @@
 #flux: --env=FLUX_TO_BASH={{nnodes}}
 
 # Modules to run
-module load rocm craype-accel-amd-gfx942 libfabric/2.1
+module load rocm/6.4.3 craype-accel-amd-gfx942 
 # Environment variables to set
 ## Turn on GPU-AWARE Cray MPICH
 export MPICH_GPU_SUPPORT_ENABLED=1
 export OMP_NUM_THREADS=7
 ## Get that special RCCL
-#RCCL_PLUGIN=/g/g16/derek/apps/nccl-plugin
+RCCL_PLUGIN=/g/g16/derek/apps/nccl-plugin
 #RCCL_PLUGIN=/g/g16/derek/apps/rccl-plugin
-#export LD_LIBRARY_PATH="${RCCL_PLUGIN}/lib:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="${RCCL_PLUGIN}/lib:${LD_LIBRARY_PATH}"
 
 # Variable Setup (including variables pulled from top level script/flux) 
 NODES=$FLUX_TO_BASH
@@ -22,13 +22,14 @@ ACG_EXE=/g/g16/derek/git/aCG/build/acg-hip
 MXT_EXE=/g/g16/derek/git/aCG/build2/mtxpartition
 
 #MATRICES=("poisson1d_1073741824")
-#MATRICES=("audikw_1" "Bump_2911" "Cube_Coup_dt0" "Flan_1565" "Queen_4147" "Serena")
+MATRICES=("audikw_1" "Bump_2911" "Cube_Coup_dt0" "Flan_1565" "Queen_4147" "Serena" "nd24k" "ldoor")
 #MATRICES=("audikw_1" "Serena")
-MATRICES=("nd24k")
-#MODES=("mpi" "rccl" "st")
-MODES=("mpi" "st")
+#MATRICES=("Pflow73m")
+MODES=("mpi" "rccl" "st")
+#MODES=("mpi" "st")
 
 #ulimit -c unlimited
+ulimit -c 0
 #ROCPROF_EXE="rocprofv3 --output-directory /usr/workspace/derek/out --sys-trace --output-format pftrace --"
 
 # Scale through PPN
