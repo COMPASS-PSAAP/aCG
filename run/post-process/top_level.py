@@ -18,6 +18,8 @@ def main():
     parser.add_argument('--plot-dir', 
                         help="Directory to save the resulting plots. (Required if --plot)")
 
+    parser.add_argument('--matrix-filter',
+                        help="Comma separated list of matrices to show in plots. Does nothing if --plot is not used.")
     args = parser.parse_args()
 
     ###  Validate input options
@@ -63,7 +65,7 @@ def main():
 
         print(f"Running grep for solver times in {args.input_dir}...")
         with open(times_grep_out, 'w') as f:
-            subprocess.run(['grep', '-r', 'solver time: ', args.input_dir], stdout=f)
+            subprocess.run(['grep', '-r', '-E', 'communication|solver time: ', args.input_dir], stdout=f)
 
         print("Parsing statistics to CSV...")
         subprocess.run(['python3', 'parse/parse_stats.py', '--input', stats_grep_out, '--output', stats_csv])
@@ -83,6 +85,12 @@ def main():
 
     ### Run code for creating plots
     if args.plot:
+        ## Check if matrix selection present:
+        if args.matrix_filter:
+            matrix_flag = f'{args.matrix_filter}'
+        else:
+            matrix_flag = 'all'
+
         ## Figure out which data is present:
         unique_prefixes = set()
         for filename in os.listdir(args.csv_dir):
@@ -93,8 +101,8 @@ def main():
         comma_separated_systems = ", ".join(sorted(unique_prefixes))
         print(f"Creating plots for {comma_separated_systems}...")
         os.makedirs(args.plot_dir, exist_ok=True)
-        subprocess.run(['python3', 'plot/plots.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir, '--systems', comma_separated_systems])
-        subprocess.run(['python3', 'plot/plot2.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir, '--systems', comma_separated_systems])
+        subprocess.run(['python3', 'plot/plots.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir, '--systems', comma_separated_systems, '--matrix-filter', matrix_flag])
+        #subprocess.run(['python3', 'plot/plot2.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir, '--systems', comma_separated_systems, '--matrix-filter', matrix_flag])
         print(f"Done! Plots saved in {os.path.abspath(args.plot_dir)}")
 
 if __name__ == '__main__':

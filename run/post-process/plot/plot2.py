@@ -14,6 +14,7 @@ parser = argparse.ArgumentParser(description="Create plots comparing MPI, ST, an
 parser.add_argument('--csv-dir', required=True, help="Directory to read in the CSV files from.")
 parser.add_argument('--plot-dir', required=True, help="Directory to save the resulting plots (png files).")
 parser.add_argument('--systems', required=True, help="Comma-separated list of systems to look for data from.")
+parser.add_argument('--matrix-filter', help="Comma-separated list of matrices to show.")
 args = parser.parse_args()
 
 FIGURE_DIR  = args.plot_dir
@@ -30,13 +31,24 @@ palette = {
     'Queen_4147':'tab:purple',
     'Serena':'tab:gray',
     'nd24k':'tab:cyan',
-    'ldoor':'tab:olive'
+    'ldoor':'tab:olive',
+    'agg14m' : 'tab:blue',
+    'guenda11m' : 'tab:green'
 }
 
 system_order = ["Frontier", "Tuolumne"]
 full_backend_order = ["Cray MPICH", "Stream-Triggered", "RCCL"]
-matrix_order = ['audikw_1', 'Bump_2911', 'Cube_Coup_dt0', 'Flan_1565', 'Queen_4147', 'Serena', 'nd24k', 'ldoor']
-matrix_filter = ['audikw_1', 'Queen_4147', 'Serena']
+
+if args.matrix_filter and args.matrix_filter == 'all':
+    matrix_filter = []
+    matrix_order = ['audikw_1', 'Bump_2911', 'Cube_Coup_dt0', 'Flan_1565', 'Queen_4147', 'Serena', 'nd24k', 'ldoor', 'agg14m', 'guenda11m' ]
+elif args.matrix_filter:
+    matrix_filter = args.matrix_filter.split(",")
+    matrix_order = args.matrix_filter.split(",")
+else:
+    matrix_filter = ['audikw_1', 'Queen_4147', 'Serena']
+    matrix_order  = ['audikw_1', 'Queen_4147', 'Serena']
+print("Using filter:", matrix_filter)
 
 def setup_kargs_and_title(k, breakdown, hue, style):
     k["height"] = 3.5
@@ -84,7 +96,10 @@ def make_runtime_plot(data, x, yscale, breakdown, style="Problem Size (GB)", hue
 
 def make_speedup_plot(data, x, yscale, breakdown, style="Matrix", hue="Backend", extra=""):
     kargs = {}
-    some_data = data[ data['Matrix'].isin(matrix_filter)]
+    if matrix_filter:
+        some_data = data[ data['Matrix'].isin(matrix_filter)]
+    else:
+        some_data = data
     title = setup_kargs_and_title(kargs, breakdown, hue, style)
 
     speedup_plot = sbn.relplot(data=some_data, kind="line", x=x, y="Speedup", 
@@ -104,7 +119,10 @@ def make_speedup_plot(data, x, yscale, breakdown, style="Matrix", hue="Backend",
 
 def make_percent_plot(data, x, breakdown, y="Speedup", style="Backend", invertx=False, extra=""):
     ### Relative improvement in speedup by Problem Size
-    mpiadvancedata = data[ data['Backend'].isin(["Stream-Triggered", "RCCL"]) & data['Matrix'].isin(matrix_filter) ]
+    if matrix_filter:
+        mpiadvancedata = data[ data['Backend'].isin(["Stream-Triggered", "RCCL"]) & data['Matrix'].isin(matrix_filter) ]
+    else:
+        mpiadvancedata = data[ data['Backend'].isin(["Stream-Triggered", "RCCL"]) ]
     kargs = {}
     title = setup_kargs_and_title(kargs, breakdown, "Matrix", style)
     print(mpiadvancedata)

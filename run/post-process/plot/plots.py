@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser(description="General plots comparing Speedup to
 parser.add_argument('--csv-dir', required=True, help="Directory to read in the CSV files from.")
 parser.add_argument('--plot-dir', required=True, help="Directory to save the resulting plots (png files).")
 parser.add_argument('--systems', required=True, help="Comma-separated list of systems to look for data from.")
+parser.add_argument('--matrix-filter', help="Comma-separated list of matrices to show.")
 args = parser.parse_args()
 
 FIGURE_DIR = args.plot_dir
@@ -23,7 +24,6 @@ CLI_SYSTEMS = args.systems.split(",")
 # Experiment configurations
 BASELINE_BACKEND = 'Cray MPICH'
 OTHER_BACKENDS = ["RCCL", "Stream-Triggered"]
-MATRICES = ["audikw_1", "Queen_4147", "Serena"]
 
 # Visual customizations
 BACKEND_COLORS = {
@@ -32,10 +32,25 @@ BACKEND_COLORS = {
 }
 
 MATRIX_MARKERS = {
-    "audikw_1": "o",
-    "Queen_4147": "s",
-    "Serena": "^"
-}
+    'audikw_1' : 'o',
+     'Bump_2911' : 'v',
+      'Cube_Coup_dt0' : '^',
+       'Flan_1565' : '<',
+        'Queen_4147': '>',
+        'Serena' : '8',
+        'nd24k' : 's',
+         'ldoor': 'p',
+          'agg14m': 'P',
+           'guenda11m' :'X'}
+
+
+if args.matrix_filter and args.matrix_filter == 'all':
+    MATRICES = []
+elif args.matrix_filter:
+    MATRICES = args.matrix_filter.split(",")
+else:
+    MATRICES = ['audikw_1', 'Queen_4147', 'Serena']
+print("Using filter:", MATRICES)
 
 # ==========================================
 # Plot function
@@ -46,7 +61,8 @@ def acg_plot(x_data, x_data_name, x_data_label, curr_system=""):
 
     # Filter for the plots
     plot_data = plot_data[plot_data['Backend'].isin(OTHER_BACKENDS)]
-    plot_data = plot_data[plot_data['Matrix'].isin(MATRICES)]
+    if MATRICES:
+        plot_data = plot_data[plot_data['Matrix'].isin(MATRICES)]
     plot_data = plot_data[plot_data['system'] == curr_system]
 
     plt.figure(figsize=(10, 6))
@@ -105,7 +121,8 @@ df_solver['total_ranks'] = df_solver['nodes'] * df_solver['ppn']
 df_mpi['total_ranks'] = df_mpi['nodes'] * df_mpi['ppn']
 
 # 2. Process MPI Stats for X-axis (Average Message Size)
-df_mpi = df_mpi[df_mpi['Matrix'].isin(MATRICES)]
+if MATRICES:
+    df_mpi = df_mpi[df_mpi['Matrix'].isin(MATRICES)]
 df_mpi['rank_avg_msg_size'] = df_mpi['bytes sent per iteration'] / df_mpi['messages sent per iteration'].replace(0, np.nan)
 
 # For Plot 1
@@ -176,7 +193,8 @@ for curr_system in CLI_SYSTEMS:
 
     # Filter for the plots
     all_data = all_data[all_data['Backend'].isin(OTHER_BACKENDS)]
-    all_data = all_data[all_data['Matrix'].isin(MATRICES)]
+    if MATRICES:
+        all_data = all_data[all_data['Matrix'].isin(MATRICES)]
     all_data = all_data[all_data['system'] == curr_system]
 
     fig = plt.figure(figsize=(10, 6))
