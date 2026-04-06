@@ -13,15 +13,16 @@ import glob
 parser = argparse.ArgumentParser(description="Create plots comparing MPI, ST, and RCCL backends in aCG")
 parser.add_argument('--csv-dir', required=True, help="Directory to read in the CSV files from.")
 parser.add_argument('--plot-dir', required=True, help="Directory to save the resulting plots (png files).")
+parser.add_argument('--systems', required=True, help="Comma-separated list of systems to look for data from.")
 args = parser.parse_args()
 
-FIGURE_DIR = args.plot_dir
-SOLVER_CSV = os.path.join(args.csv_dir, 'solver_times.csv')
+FIGURE_DIR  = args.plot_dir
+CLI_SYSTEMS = args.systems.split(",")
 
 palette = {
     'Cray MPICH': 'tab:green',
     'Stream-Triggered': 'tab:blue',
-    'RCCL' : 'tab:orange',
+    'RCCL' : 'tab:red',
     'audikw_1':'tab:blue',
     'Bump_2911':'tab:green',
     'Cube_Coup_dt0':'tab:orange',
@@ -124,7 +125,9 @@ def make_percent_plot(data, x, breakdown, y="Speedup", style="Backend", invertx=
     plt.close()
 
 # Read the raw data into a Pandas Data Frame
-df = pd.read_csv(SOLVER_CSV)
+SOLVER_CSV  = os.path.join(args.csv_dir, '*solver_times.csv')
+all_files = glob.glob(SOLVER_CSV)
+df = pd.concat((pd.read_csv(f) for f in all_files), ignore_index=True)
 
 # Fix the labels of the columns to be more readable
 df = df.rename(columns={'nodes':'Nodes', 'ppn':'GPUs per Node', 
@@ -134,12 +137,6 @@ df = df.rename(columns={'nodes':'Nodes', 'ppn':'GPUs per Node',
 df['Backend'] = df['Backend'].replace({"st":"Stream-Triggered",
                                        "rccl": "RCCL",
                                        "mpi":"Cray MPICH"})
-# Fix the names of the backends to be more readable
-df['System'] = df['System'].replace({"tioga":"Tioga",
-                                     "tuolumne":"Tuolumne",
-                                     "TUOLUMNE":"Tuolumne",
-                                     "frontier":"Frontier"})
-
 
 # Compute derived values to use to generate data to plot from measured terms
 ## The total number of MPI ranks used in a sample
@@ -190,14 +187,16 @@ speedupdata=df[  df['Backend'].isin([
     "RCCL", 
     "Cray MPICH"])
               ]
-tuodata=speedupdata[ speedupdata['System'].isin(["Tuolumne"]) ]
 
-make_speedup_plot(data=tuodata, x="Ranks", yscale="log", breakdown="", extra="-Tuolumne")
-make_speedup_plot(data=tuodata, x="Ranks", yscale="linear", breakdown="", extra="-Tuolumne")
-make_percent_plot(data=tuodata, x='Ranks', breakdown="", extra="-Tuolumne")
+for graph_system in CLI_SYSTEMS:
+    graph_system = graph_system.capitalize()
+    system_data=speedupdata[ speedupdata['System'].isin([graph_system]) ]
+    system_extra=f'-{graph_system}'
 
-## On tuolumne (but not Frontier), the speedup for Cray MPICH is highly dependent on PPN 
-## Break these down separately by system since they have different PPNs they can support
-make_speedup_plot(data=tuodata, x="Ranks", yscale="log", breakdown="GPUs per Node", extra="-Tuolumne")
-make_speedup_plot(data=tuodata, x="Ranks", yscale="linear", breakdown="GPUs per Node", extra="-Tuolumne")
-make_percent_plot(data=tuodata, x='Ranks', breakdown="GPUs per Node", extra="-Tuolumne")
+    make_speedup_plot(data=system_data, x="Ranks", yscale="log", breakdown="", extra=system_extra)
+    make_speedup_plot(data=system_data, x="Ranks", yscale="linear", breakdown="", extra=system_extra)
+    make_percent_plot(data=system_data, x='Ranks', breakdown="", extra=system_extra)
+
+    make_speedup_plot(data=system_data, x="Ranks", yscale="log", breakdown="GPUs per Node", extra=system_extra)
+    make_speedup_plot(data=system_data, x="Ranks", yscale="linear", breakdown="GPUs per Node", extra=system_extra)
+    make_percent_plot(data=system_data, x='Ranks', breakdown="GPUs per Node", extra=system_extra)

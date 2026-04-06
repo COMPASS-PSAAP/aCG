@@ -31,7 +31,7 @@ def main():
                 
                 full_path, file_name, solver_time = match.groups()
                 dir_name = os.path.basename(os.path.normpath(full_path))
-                system = dir_name.split('-')[0]
+                system = dir_name.split('-')[0].capitalize()
 
                 base = file_name.replace('.out', '')
                 try:

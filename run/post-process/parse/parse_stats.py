@@ -30,7 +30,7 @@ def main():
             full_path, file_name, rank, action, total_bytes, bytes_per_it, msg_per_it = match.groups()
             # Get just the immediate parent folder name (e.g., SYSTEM-NODES-MONTH-DAY-RUN)
             dir_name = os.path.basename(os.path.normpath(full_path))
-            system = dir_name.split('-')[0]
+            system = dir_name.split('-')[0].capitalize()
             
             # Safely extract matrix, nodes, and ppn
             base = file_name.replace('.out', '')

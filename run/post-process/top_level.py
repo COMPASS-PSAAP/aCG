@@ -39,13 +39,23 @@ def main():
     if args.parse:
         os.makedirs(args.csv_dir, exist_ok=True)
 
+        # Figure out system
+        cluster_name = os.getenv("LCSCHEDCLUSTER")
+        if not cluster_name:
+            cluster_name = os.getenv("LMOD_SYSTEM_NAME")
+        
+        if cluster_name:
+            cluster_name += "_"
+        else:
+            cluster_name = ""
+
         # Temporary files for grep routing
         stats_grep_out = os.path.join(args.csv_dir, 'temp_stats.txt')
         times_grep_out = os.path.join(args.csv_dir, 'temp_times.txt')
 
         # Final outputs
-        stats_csv = os.path.join(args.csv_dir, 'mpi_stats.csv')
-        times_csv = os.path.join(args.csv_dir, 'solver_times.csv')
+        stats_csv = os.path.join(args.csv_dir, f'{cluster_name}mpi_stats.csv')
+        times_csv = os.path.join(args.csv_dir, f'{cluster_name}solver_times.csv')
 
         print(f"Running grep for MPI statistics in {args.input_dir}...")
         with open(stats_grep_out, 'w') as f:
@@ -73,10 +83,18 @@ def main():
 
     ### Run code for creating plots
     if args.plot:
-        print("Creating plots...")
+        ## Figure out which data is present:
+        unique_prefixes = set()
+        for filename in os.listdir(args.csv_dir):
+            # Check if it's a file to avoid accidentally splitting directory names
+            if os.path.isfile(os.path.join(args.csv_dir, filename)):
+                a_part = filename.split('_')[0].capitalize()
+                unique_prefixes.add(a_part)
+        comma_separated_systems = ", ".join(sorted(unique_prefixes))
+        print(f"Creating plots for {comma_separated_systems}...")
         os.makedirs(args.plot_dir, exist_ok=True)
-        subprocess.run(['python3', 'plot/plots.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir])
-        subprocess.run(['python3', 'plot/plot2.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir])
+        subprocess.run(['python3', 'plot/plots.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir, '--systems', comma_separated_systems])
+        subprocess.run(['python3', 'plot/plot2.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir, '--systems', comma_separated_systems])
         print(f"Done! Plots saved in {os.path.abspath(args.plot_dir)}")
 
 if __name__ == '__main__':
