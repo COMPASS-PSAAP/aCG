@@ -94,13 +94,34 @@ def make_runtime_plot(data, x, yscale, breakdown, style="Problem Size (GB)", hue
     plt.savefig(filepath)
     plt.close()
 
-def make_speedup_plot(data, x, yscale, breakdown, style="Matrix", hue="Backend", extra=""):
+def get_max_speedup(data):
+    if matrix_filter:
+        some_data = data[ data['Matrix'].isin(matrix_filter)]
+    else:
+        some_data = data
+
+    pd.set_option('display.width', 240)
+    #print(some_data)
+
+    # Get averages first
+    avg_df = some_data.groupby(["System", "Matrix", "Ranks", "Backend"])['Speedup'].mean().reset_index()
+
+    result_indices = avg_df.groupby(['Backend', 'Matrix'])['Speedup'].idxmax()
+    final_df = avg_df.loc[result_indices]
+    print(final_df)
+
+
+def make_speedup_plot(data, x, yscale, breakdown, style="Matrix", hue="Backend", extra="", print_data=False):
     kargs = {}
     if matrix_filter:
         some_data = data[ data['Matrix'].isin(matrix_filter)]
     else:
         some_data = data
     title = setup_kargs_and_title(kargs, breakdown, hue, style)
+
+    if(print_data):
+        pd.set_option('display.width', 200)
+        print(some_data)
 
     speedup_plot = sbn.relplot(data=some_data, kind="line", x=x, y="Speedup", 
                                errorbar=("ci", 95), 
@@ -125,7 +146,6 @@ def make_percent_plot(data, x, breakdown, y="Speedup", style="Backend", invertx=
         mpiadvancedata = data[ data['Backend'].isin(["Stream-Triggered", "RCCL"]) ]
     kargs = {}
     title = setup_kargs_and_title(kargs, breakdown, "Matrix", style)
-    print(mpiadvancedata)
    
     percent_plot = sbn.relplot(data=mpiadvancedata, kind="line", x=x, 
                                y=f"Percent {y} Improvement",
@@ -211,9 +231,12 @@ for graph_system in CLI_SYSTEMS:
     system_data=speedupdata[ speedupdata['System'].isin([graph_system]) ]
     system_extra=f'-{graph_system}'
 
-    make_speedup_plot(data=system_data, x="Ranks", yscale="log", breakdown="", extra=system_extra)
+    make_speedup_plot(data=system_data, x="Ranks", yscale="log", breakdown="", extra=system_extra, print_data=False)
     make_speedup_plot(data=system_data, x="Ranks", yscale="linear", breakdown="", extra=system_extra)
     make_percent_plot(data=system_data, x='Ranks', breakdown="", extra=system_extra)
+
+    # Print out max speedup for each system
+    get_max_speedup(system_data)
 
     make_speedup_plot(data=system_data, x="Ranks", yscale="log", breakdown="GPUs per Node", extra=system_extra)
     make_speedup_plot(data=system_data, x="Ranks", yscale="linear", breakdown="GPUs per Node", extra=system_extra)

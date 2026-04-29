@@ -23,10 +23,8 @@ MXT_EXE=/g/g16/derek/git/aCG/build2/mtxpartition
 
 #MATRICES=("poisson1d_1073741824")
 MATRICES=("audikw_1" "Bump_2911" "Cube_Coup_dt0" "Flan_1565" "Queen_4147" "Serena" "nd24k" "ldoor")
-#MATRICES=("audikw_1" "Serena")
-#MATRICES=("Pflow73m")
+#MATRICES=("guenda11m" "agg14m")
 MODES=("mpi" "rccl" "st")
-#MODES=("mpi" "st")
 
 #ulimit -c unlimited
 ulimit -c 0

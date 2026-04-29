@@ -98,11 +98,11 @@ def main():
             if os.path.isfile(os.path.join(args.csv_dir, filename)):
                 a_part = filename.split('_')[0].capitalize()
                 unique_prefixes.add(a_part)
-        comma_separated_systems = ", ".join(sorted(unique_prefixes))
+        comma_separated_systems = ",".join(sorted(unique_prefixes))
         print(f"Creating plots for {comma_separated_systems}...")
         os.makedirs(args.plot_dir, exist_ok=True)
         subprocess.run(['python3', 'plot/plots.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir, '--systems', comma_separated_systems, '--matrix-filter', matrix_flag])
-        #subprocess.run(['python3', 'plot/plot2.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir, '--systems', comma_separated_systems, '--matrix-filter', matrix_flag])
+        subprocess.run(['python3', 'plot/plot2.py', '--csv-dir', args.csv_dir, '--plot-dir', args.plot_dir, '--systems', comma_separated_systems, '--matrix-filter', matrix_flag])
         print(f"Done! Plots saved in {os.path.abspath(args.plot_dir)}")
 
 if __name__ == '__main__':
