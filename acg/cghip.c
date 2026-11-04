@@ -521,23 +521,23 @@ int acgsolverhip_solvempi(
     if(comm->type == acgcomm_st)
     {
         /* Create specialized MPIS_Queue */
-        err = MPIS_Queue_init(&comm->mpist_queue, CXI, &commstream);
-        /* Match MPIS_Requests made earlier*/
-        void* match_send_reqs = malloc(halo->nrecipients*sizeof(MPIS_Request));
-        void* match_recv_reqs = malloc(halo->nsenders*sizeof(MPIS_Request));
-        for (int p = 0; p < halo->nsenders; p++) {
-            err = MPIS_Imatch(&((MPIS_Request *) cg->haloexchange->recvreqs)[p],
-                        &((MPIS_Request *) match_recv_reqs)[p]);
+        err = MPIS_Queue_create(&comm->mpist_queue, CXI, MPI_INFO_NULL, &commstream);
+        /* Match the MPIS_Requests made earlier. The requests are one
+         * contiguous [recvs | sends] block (see halo.c). The match calls
+         * return new handles and leave the originals unmatched, so match all
+         * of them in one call (the old code also matched recvs, then sends,
+         * without blocking in between), free the originals, and copy the
+         * matched handles back. */
+        int nreqs = halo->nsenders + halo->nrecipients;
+        if (nreqs > 0) {
+            MPIS_Request * reqs = (MPIS_Request *) cg->haloexchange->recvreqs;
+            MPIS_Request * matched = malloc(nreqs*sizeof(MPIS_Request));
+            if (!matched) return ACG_ERR_ERRNO;
+            err = MPIS_Matchall(nreqs, reqs, matched, MPI_INFO_NULL);
+            err = MPIS_Request_freeall(nreqs, reqs);
+            memcpy(reqs, matched, nreqs*sizeof(MPIS_Request));
+            free(matched);
         }
-        for (int p = 0; p < halo->nrecipients; p++) {
-            err = MPIS_Imatch(&((MPIS_Request *) cg->haloexchange->sendreqs)[p],
-                    &((MPIS_Request *) match_send_reqs)[p]);
-        }
-        /* Finish all matches. */
-        err = MPIS_Waitall(halo->nsenders, match_recv_reqs, MPI_STATUSES_IGNORE);
-        err = MPIS_Waitall(halo->nrecipients, match_send_reqs, MPI_STATUSES_IGNORE);
-        free(match_send_reqs);
-        free(match_recv_reqs);
     }
 #endif
 

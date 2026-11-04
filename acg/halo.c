@@ -812,10 +812,12 @@ int acghaloexchange_init(
 #endif
 #if defined(ACG_HAVE_STREAM_TRIGGERING)
     } else if (comm->type == acgcomm_st) {
-        sendreqs = malloc(halo->nrecipients*sizeof(MPIS_Request));
-        if (!sendreqs) { free(recvbuf); free(sendbuf); return ACG_ERR_ERRNO; }
-        recvreqs = malloc(halo->nsenders*sizeof(MPIS_Request));
-        if (!recvreqs) { free(sendreqs); free(recvbuf); free(sendbuf); return ACG_ERR_ERRNO; }
+        /* One contiguous block laid out as [recvs | sends], so the queue can
+         * wait on every request with one MPIS_Enqueue_waitall call. Only
+         * recvreqs owns the allocation (see acghaloexchange_free). */
+        recvreqs = malloc((halo->nsenders+halo->nrecipients)*sizeof(MPIS_Request));
+        if (!recvreqs) { free(recvbuf); free(sendbuf); return ACG_ERR_ERRNO; }
+        sendreqs = (MPIS_Request *) recvreqs + halo->nsenders;
     }
 #else
     }
@@ -1150,6 +1152,10 @@ void acghaloexchange_free(
         //for(int index = 0; index < halo->nsenders; index++)
         //    MPIS_Request_free(&haloexchange->recvreqs[index]);
     }
+#endif
+#if defined(ACG_HAVE_STREAM_TRIGGERING)
+    /* For ST, sendreqs points into the recvreqs allocation. */
+    if (comm->type != acgcomm_st)
 #endif
     free(haloexchange->sendreqs);
     free(haloexchange->recvreqs);
@@ -2205,7 +2211,9 @@ int acghalo_exchange_hip_end(
         }
 #if defined(ACG_HAVE_STREAM_TRIGGERING)
     } else if (comm->type == acgcomm_st) {
-        MPIS_Enqueue_waitall(comm->mpist_queue);
+        /* recvreqs is the start of the contiguous [recvs | sends] block */
+        MPIS_Enqueue_waitall(comm->mpist_queue, halo->nsenders+halo->nrecipients,
+                             recvreqs, MPI_STATUSES_IGNORE);
         if (!warmup) {
             int sendtypesize, recvtypesize;
             err = acgdatatype_size(sendtype, &sendtypesize); if (err) return err;

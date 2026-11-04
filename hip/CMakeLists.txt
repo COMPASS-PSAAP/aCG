@@ -128,9 +128,17 @@ if (RCCL_FOUND)
     add_definitions(-DACG_HAVE_RCCL)
 endif ()
 
-find_package(stream-triggering)
+option(ACG_REQUIRE_STREAM_TRIGGERING "Fail if stream-triggering is not found" OFF)
+if (ACG_REQUIRE_STREAM_TRIGGERING)
+    find_package(stream-triggering REQUIRED)
+else ()
+    find_package(stream-triggering)
+endif ()
 if (stream-triggering_FOUND)
+    message(STATUS "stream-triggering found: ${stream-triggering_DIR} (--comm st enabled)")
     add_definitions(-DACG_HAVE_STREAM_TRIGGERING)
+else ()
+    message(STATUS "stream-triggering not found (--comm st disabled)")
 endif ()
 
 find_package(ZLIB)
@@ -157,13 +165,14 @@ find_path(ROCTX_INCLUDE_DIR
     HINTS ${ROCM_PATH}/include
 )
 
-# Optional: Fail the build early if roctx isn't found
-if(NOT ROCTX_LIB OR NOT ROCTX_INCLUDE_DIR)
-    message(FATAL_ERROR "Could not find roctx64 library or roctracer headers in ${ROCM_PATH}")
+# roctx is optional: nothing links it at the moment (see the commented-out
+# target_link_libraries below), so only report whether it was found.
+if(ROCTX_LIB AND ROCTX_INCLUDE_DIR)
+    message(STATUS "Found ROCTX Include: ${ROCTX_INCLUDE_DIR}")
+    message(STATUS "Found ROCTX Library: ${ROCTX_LIB}")
+else()
+    message(STATUS "roctx not found in ${ROCM_PATH} (optional, not used)")
 endif()
-
-message(STATUS "Found ROCTX Include: ${ROCTX_INCLUDE_DIR}")
-message(STATUS "Found ROCTX Library: ${ROCTX_LIB}")
 
 if (IDXSIZE EQUAL 64)
   message(STATUS "index type for matrices and vectors (acgidx_t) - int64_t")
