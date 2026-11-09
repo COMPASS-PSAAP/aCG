@@ -378,7 +378,14 @@ __global__ void csrgemv_merge_startrows(
  * These functions are from:
  *
  * https://github.com/ROCm/clr/blob/develop/hipamd/include/hip/amd_detail/amd_warp_sync_functions.h#L171
+ *
+ * They are only needed where HIP's headers don't already provide them. ROCm 7 enables the
+ * warp-sync builtins by default (and no longer defines __AMDGCN_WAVEFRONT_SIZE), so copying them
+ * there is a redefinition error; before ROCm 7 they were opt-in through
+ * HIP_ENABLE_WARP_SYNC_BUILTINS.
  */
+#if HIP_VERSION_MAJOR < 7 && !defined(HIP_ENABLE_WARP_SYNC_BUILTINS)
+#define ACG_HIP_WARP_SYNC_FALLBACK
 
 // Since threads in a wave do not make independent progress, __activemask()
 // always returns the exact active mask, i.e, all active threads in the wave.
@@ -519,6 +526,7 @@ T __shfl_down_sync(MaskT mask, T var, unsigned int delta,
   __hip_check_mask(mask);
   return __shfl_down(var, delta, width);
 }
+#endif /* ACG_HIP_WARP_SYNC_FALLBACK */
 
 /*
  * Merge-based CSR SpMV
