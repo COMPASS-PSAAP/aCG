@@ -1029,14 +1029,29 @@ int main(int argc, char *argv[])
         if (CPU_ISSET(i, &mask)) { j += snprintf(&cpus[j], cpuslen-j+1, n==0 ? "%d" : ",%d", i); n++; }
     }
 
+#ifdef _OPENMP
+    /* Start the OpenMP runtime on every rank here, not only on the root.
+     * libomp copies the whole environment when it starts, and with Cray
+     * MPICH 9.1.0 (Tuolumne, ROCm 7.14) on more than one node, MPI_Init
+     * leaves an environ entry pointing into the stack: find_provider()
+     * putenv()s "FI_PROVIDER=cxi" from a buffer in its own stack frame, which
+     * is dead once MPI_Init returns. A rank that first starts OpenMP deeper in the
+     * call stack (in the first parallel loop of the setup) can copy changing
+     * stack memory through it and overrun libomp's copy: heap corruption,
+     * only on non-root ranks, depending on the environment's size. The root
+     * has always started here and never crashed. */
+    int nompthreads = 0;
+    #pragma omp parallel
+    {
+        #pragma omp master
+        nompthreads = omp_get_num_threads();
+    }
+#endif
     if (rank == root) {
         fprintf(stderr, "%'d MPI processes\n", commsize);
 #ifdef _OPENMP
-        #pragma omp parallel
-        if (args.verbose > 0 && rank == root) {
-            #pragma omp master
-            fprintf(stderr, "%'d OpenMP threads\n", omp_get_num_threads());
-        }
+        if (args.verbose > 0)
+            fprintf(stderr, "%'d OpenMP threads\n", nompthreads);
 #else
         fprintf(stderr, "OpenMP is disabled\n", omp_get_num_threads());
 #endif
