@@ -1107,7 +1107,19 @@ int main(int argc, char *argv[])
         ncclUniqueId nccluid;
         if (rank == root) ncclGetUniqueId(&nccluid);
         MPI_Bcast(&nccluid, sizeof(nccluid), MPI_BYTE, root, mpicomm);
+        /* RCCL binds its proxy threads to the calling thread's CPU mask
+         * intersected with the GPU's cores. OpenMP has started by now, and
+         * with OMP_PROC_BIND=spread (Tuolumne's job environment) libomp has
+         * pinned this thread to one core, so the proxy threads would share
+         * it with this thread (5-40x slower off-node). Give RCCL the rank's
+         * mask from before OpenMP started (mpibind's, without the system
+         * cores) while it initialises, then restore libomp's binding. */
+        cpu_set_t ompmask;
+        CPU_ZERO(&ompmask);
+        int ompmaskerr = sched_getaffinity(0, sizeof(ompmask), &ompmask);
+        if (!ompmaskerr) sched_setaffinity(0, sizeof(mask), &mask);
         err = ncclCommInitRank(&ncclcomm, commsize, nccluid, rank);
+        if (!ompmaskerr) sched_setaffinity(0, sizeof(ompmask), &ompmask);
         if (err) {
             fprintf(stderr, "%s: %s\n", program_invocation_short_name, ncclGetErrorString(err));
             MPI_Finalize();
